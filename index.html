@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mars Rover Photo Search</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    img { width: 300px; margin: 10px; border-radius: 8px; }
+    select, input, button { margin: 5px 0; padding: 5px; }
+    #spinner {
+      display: none;
+      margin-top: 10px;
+    }
+    #spinner::after {
+      content: "🔄 Loading...";
+      font-style: italic;
+      color: gray;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mars Rover Photo Search</h1>
+
+  <label>Rover:
+    <select id="roverSelect">
+      <option value="all">All Rovers</option>
+      <option value="perseverance">Perseverance</option>
+      <option value="curiosity">Curiosity</option>
+      <option value="opportunity">Opportunity</option>
+      <option value="spirit">Spirit</option>
+    </select>
+  </label>
+  <br />
+
+  <label>Camera:
+    <select id="cameraSelect">
+      <option value="all">All Cameras</option>
+      <option value="FHAZ">Front Hazard Avoidance Camera</option>
+      <option value="RHAZ">Rear Hazard Avoidance Camera</option>
+      <option value="MAST">Mast Camera</option>
+      <option value="CHEMCAM">Chemistry and Camera Complex</option>
+      <option value="MAHLI">Mars Hand Lens Imager</option>
+      <option value="MARDI">Mars Descent Imager</option>
+      <option value="NAVCAM">Navigation Camera</option>
+      <option value="PANCAM">Panoramic Camera</option>
+      <option value="MINITES">Miniature Thermal Emission Spectrometer</option>
+    </select>
+  </label>
+  <br />
+
+  <label>Start Date:
+    <input type="date" id="startDate" />
+  </label>
+  <br />
+
+  <label>End Date:
+    <input type="date" id="endDate" />
+  </label>
+  <br />
+
+  <button id="fetchButton">Search</button>
+
+  <p>If you leave everything blank, you'll get the most recent photos from all rovers and cameras (last 7 days).</p>
+
+  <div id="spinner"></div>
+  <div id="output">Photos will appear here...</div>
+
+  <script>
+    const apiKey = "e066a0DifBW5ethncfzuLkCRVdEvjcxKM0PpwXem"; // Replace with your real API key
+    const output = document.getElementById("output");
+    const spinner = document.getElementById("spinner");
+
+    function getLast7Days() {
+      const today = new Date();
+      const lastWeek = new Date(today);
+      lastWeek.setDate(today.getDate() - 6);
+      return {
+        start: lastWeek.toISOString().split("T")[0],
+        end: today.toISOString().split("T")[0]
+      };
+    }
+
+    document.getElementById("fetchButton").addEventListener("click", async () => {
+      const rover = document.getElementById("roverSelect").value;
+      const camera = document.getElementById("cameraSelect").value;
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+
+      // Validate date logic
+      if (start && end && end < start) {
+        alert("End date cannot be before start date.");
+        return;
+      }
+
+      output.innerHTML = "";
+      spinner.style.display = "block";
+
+      const rovers = rover === "all"
+        ? ["perseverance", "curiosity", "opportunity", "spirit"]
+        : [rover];
+
+      const dateRange = (!start && !end) ? getLast7Days() : { start, end };
+
+      try {
+        let photosFound = false;
+
+        for (const r of rovers) {
+          const date = dateRange.end;
+
+          const isLatest = (!start && !end);
+          let url = isLatest
+            ? `https://api.nasa.gov/mars-photos/api/v1/rovers/${r}/latest_photos?api_key=${apiKey}`
+            : `https://api.nasa.gov/mars-photos/api/v1/rovers/${r}/photos?earth_date=${date}&api_key=${apiKey}`;
+
+          if (camera !== "all") {
+            url += `&camera=${camera}`;
+          }
+
+          const response = await fetch(url);
+          const data = await response.json();
+          const photos = isLatest ? data.latest_photos : data.photos;
+
+          if (photos.length > 0) {
+            photosFound = true;
+            output.innerHTML += `<h2>${r.charAt(0).toUpperCase() + r.slice(1)} Rover</h2>`;
+            photos.forEach(photo => {
+              const img = document.createElement("img");
+              img.src = photo.img_src;
+              img.alt = `Taken by ${photo.camera.full_name}`;
+              output.appendChild(img);
+            });
+          }
+        }
+
+        if (!photosFound) {
+          output.innerHTML = "No photos found for the selected options.";
+        }
+
+      } catch (error) {
+        output.innerHTML = `Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>
